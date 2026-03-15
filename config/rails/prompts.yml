@@ -1,0 +1,31 @@
+prompts:
+  - task: generate_qa
+    output_parser: is_json
+    content: |
+      You are a world-class synthetic data generator. 
+      Given the document below, generate 3 highly specific Question and Answer pairs.
+      
+      DOCUMENT:
+      {{ source_text }}
+      
+      FORMAT REQUIREMENTS:
+      - Return ONLY a JSON list of objects.
+      - Each object must have "question" and "answer" keys.
+      - Do not include any conversational filler.
+      
+      JSON OUTPUT:
+
+
+  - task: self_check_facts
+    content: |
+      Context:
+      {{ context.relevant_chunks }}
+
+      Assistant Response:
+      {{ last_bot_message }}
+
+      Is the response above factually supported by the context? 
+      Respond with "yes" or "no".
+
+      Answer:
+    output_parser: "is_content_safe"

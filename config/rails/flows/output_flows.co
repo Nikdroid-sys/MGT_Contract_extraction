@@ -1,0 +1,9 @@
+flow outputrails $output_text
+  activate adf_output_validation
+  activate adf_privacy_masking
+
+flow adf_output_validation
+  when bot said something as $event
+    $check = await self_check_hallucination(text=$event.text)
+    if $check == "hallucination"
+      bot say "⚠️ The generated answer may not be reliable."

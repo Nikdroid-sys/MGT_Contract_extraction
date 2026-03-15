@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentRunResult",
+  "type": "object",
+  "required": [
+    "trace_id",
+    "scenario",
+    "status",
+    "created_at",
+    "stages"
+  ],
+  "properties": {
+    "trace_id": {
+      "type": "string",
+      "description": "Correlation id carried across stages"
+    },
+    "scenario": {
+      "type": "string",
+      "enum": [
+        "scenario_1_lead",
+        "scenario_2_contract",
+        "scenario_3_research"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "needs_review",
+        "failed"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "confidence_rationale": {
+      "type": "string"
+    },
+    "decision": {
+      "type": "object",
+      "description": "Top-level decision(s) that affect routing"
+    },
+    "artifacts": {
+      "type": "object",
+      "description": "Generated outputs (email draft, extraction, report, etc.)"
+    },
+    "stages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "status",
+          "started_at"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "skipped",
+              "retrying",
+              "failed"
+            ]
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "input_summary": {
+            "type": "string"
+          },
+          "output_summary": {
+            "type": "string"
+          },
+          "tool_calls": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

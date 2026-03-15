@@ -1,0 +1,14 @@
+flow adf_privacy_masking
+  when user said something as $event
+    $masked = await gliner_mask_pii(text=$event.text)
+    $last_user_utterance = $masked
+
+  when bot said something as $event
+    $masked = await gliner_mask_pii(text=$event.text)
+    $last_bot_utterance = $masked
+
+flow adf_input_security
+  when user said something as $event
+    $check = await injection_detection(text=$event.text)
+    if $check == "malicious"
+      bot say "⚠️ Request blocked due to security policy."

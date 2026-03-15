@@ -1,0 +1,33 @@
+# Env and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv
+venv
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+
+# Git / IDE
+.git
+.gitignore
+.cursor
+.idea
+*.md
+!README.md
+
+# Local data
+runs.db
+*.db
+
+# Tests and dev
+tests
+scripts
+docs
+
+# Lock optional (Render may build without it)
+# uv.lock

@@ -1,0 +1,22 @@
+# NeMo Guardrails: uses GROQ_API_KEY; input capped to MAX_NEMO_CHARS (default 6000) to save tokens.
+# When LLM_PROVIDER=gemini, extractor/auditor use Gemini; NeMo still uses Groq here (set GROQ_API_KEY for NeMo).
+colang_version: "2.x"
+main_flow: main
+
+models:
+  - type: main
+    engine: openai
+    model: llama-3.3-70b-versatile
+    api_key_env_var: GROQ_API_KEY
+    parameters:
+      openai_api_base: "https://api.groq.com/openai/v1"
+
+# Output rails disabled by default (saves one LLM call; extraction is schema-constrained).
+# Set NEMO_OUTPUT_RAILS_ENABLED=true and add flow names under output.flows to enable.
+rails:
+  library:
+    csl:
+      - core
+  flows_path: flows
+  output:
+    flows: []
