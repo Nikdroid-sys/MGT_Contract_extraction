@@ -1,0 +1,145 @@
+To implement this correctly, we need to distinguish between the **Internal Agent Logic** (what the agents do) and the **External Trace Logic** (how we log the overall run).
+
+### 1. The Two Schemas: Who uses what?
+
+* **`ContractKeyTermsExtraction` (The Artifact):** This is the **output** of the Extractor Agent. It is the core "business value" of the run. It goes inside the `artifacts` field of the larger result.
+* **`AgentRunResult` (The Trace):** This is the **wrapper** managed by LangGraph. It tracks the metadata, the history of stages (Extractor, Auditor, etc.), and the final status. This is what you send to **Google Sheets**.
+
+**Key Difference:** `ContractKeyTermsExtraction` is *what* we found; `AgentRunResult` is *how* we found it.
+
+---
+
+### 2. The API Endpoints
+
+To make this functional and secure, you need these four endpoints:
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/auth/login` | `POST` | Exchanges username/password for a **JWT token**. |
+| `/contract/process` | `POST` | Accepts a contract (Text/File). Triggers the LangGraph workflow. Returns `AgentRunResult`. |
+| `/contract/status/{trace_id}` | `GET` | Fetches the current state of a run from SQLite (for long-running tasks). |
+| `/analytics/dashboard` | `GET` | (Bonus) Redirects to your Google Sheet or returns a summary of total runs/confidence scores. |
+
+---
+
+### 3. Development Plan: 5-Step Sprint
+
+#### **Step 1: The Foundation (uv + pyproject.toml)**
+
+Initialize your project using `uv`.
+
+```bash
+uv init
+uv add fastapi "langgraph" "deepeval" "nemoguardrails" "python-jose[cryptography]" "python-multipart" "requests" "groq"
+
+```
+
+* **Action:** Define your `pyproject.toml` and ensure `uv sync` creates your lockfile for Render.
+
+#### **Step 2: Security & Guardrails (Local Auth + NeMo)**
+
+* **Auth:** Implement a `deps.py` that uses `python-jose` to decode JWTs. Protect the `/contract/process` endpoint.
+* **NeMo:** Create a `config/` folder for your `.yml` and `.co` files. Implement a "Top-level" guardrail that checks if the input text looks like a legal document.
+
+#### **Step 3: The Multi-Agent Graph (The Core)**
+
+Define your `AgentState` using the `AgentRunResult` schema fields.
+
+1. **Node 1 (Extractor):** Uses Groq to output `ContractKeyTermsExtraction`.
+2. **Node 2 (Auditor):** Uses `DeepEval` metrics (Faithfulness/Hallucination).
+* *Self-Healing Logic:* If `DeepEval` score < 0.8, increment `retry_count` and send back to Extractor with the error message.
+
+
+3. **Node 3 (Finalizer):** Packages everything into the `AgentRunResult` format.
+
+#### **Step 4: Observability Bridge (GSheets)**
+
+Implement the `doPost` script in Google Sheets and the Python `requests` logic to push the `AgentRunResult` JSON at the end of every graph run.
+
+#### **Step 5: Deployment (Render)**
+
+* Upload your `uv.lock`.
+* Configure environment variables (`GROQ_API_KEY`, `GSHEETS_URL`).
+* Deploy as a "Web Service."
+
+---
+
+### 4. How to Prompt for Structured Output
+
+To ensure Groq/LLMs follow these complex schemas perfectly, use **Pydantic** with LangChain/LangGraph.
+
+**Prompt Strategy:**
+
+1. **System Prompt:** "You are a legal expert. You must output valid JSON matching the provided schema. Do not include prose."
+2. **Schema Injection:** Pass the `ContractKeyTermsExtraction.json()` schema directly into the prompt or use Groq's `tool_use` / `structured_output` feature.
+
+### 5. Using DeepEval for the "Auditor"
+
+In your Auditor node, initialize a metric:
+
+```python
+from deepeval.metrics import FaithfulnessMetric
+from deepeval.test_case import LLMTestCase
+
+def audit_node(state: AgentState):
+    # 1. Setup the test case
+    test_case = LLMTestCase(
+        input=state["input_text"],
+        actual_output=str(state["artifacts"]),
+        retrieval_context=[state["input_text"]]
+    )
+    # 2. Measure
+    metric = FaithfulnessMetric(threshold=0.8)
+    metric.measure(test_case)
+    
+    # 3. Update State for the AgentRunResult schema
+    state["confidence"] = metric.score
+    state["confidence_rationale"] = metric.reason
+    return state
+
+```
+
+**Would you like me to generate the `pyproject.toml` file and the `app/core/security.py` code to get Step 1 and 2 out of the way?**
+
+
+
+
+steps to run:
+
+Summary of what’s in place:
+
+1. UV virtual environment
+Location: D:\MGT_assessment\.venv
+Python: 3.12.12 (installed by uv)
+Activate (PowerShell):
+.venv\Scripts\activate
+You can also run without activating by using uv run (see below).
+
+2. pyproject.toml updates
+Build: [build-system] with hatchling and packages = ["app"] so the app package builds and installs correctly.
+Dependencies: Added requests and groq (for GSheets and Groq API), as in the helper.
+Tool config: Removed invalid package-guide and the unused [tool.setuptools.packages.find] section; [tool.uv] kept with managed = true.
+Dev group: pytest, pytest-asyncio, and black in the dev dependency group.
+3. Sync result
+uv.lock is present; dependencies are resolved and the project is installable.
+First uv sync may take a couple of minutes (NeMo, PyMuPDF, etc.). Later syncs are much faster.
+4. .env.example
+Added so you can copy to .env and add GROQ_API_KEY, GSHEETS_WEBAPP_URL, JWT_SECRET, etc., when you start implementing.
+How to use it
+Task	Command
+Install/refresh deps	uv sync
+Install with dev tools	uv sync --group dev
+Run any command in the venv	uv run <command>
+Run the app (once you add main.py)	uv run uvicorn main:app --reload
+Run tests	uv run pytest
+You’re set to start coding: venv is created, pyproject.toml is configured, and uv sync has been run successfully. If you want, next step can be adding a minimal main.py and FastAPI app so you can run the server immediately.
+
+
+# Optional: copy and edit .env
+cp .env.example .env
+
+# Run
+uv run uvicorn main:app --reload --port 8080
+
+tasklist /FI "PID eq 9812"
+taskkill /IM python.exe /F

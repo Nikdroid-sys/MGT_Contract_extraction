@@ -9,6 +9,7 @@ from typing import Any, TypedDict
 class GraphState(TypedDict, total=False):
     """State passed between nodes. total=False so keys are optional for incremental updates."""
     input_text: str
+    input_source: str  # e.g. "file: contract.pdf" or "text" (for stage observability)
     trace_id: str
     document_id: str
     artifacts: dict[str, Any]  # ContractKeyTermsExtraction as dict

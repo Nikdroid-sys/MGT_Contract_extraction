@@ -92,19 +92,24 @@ def run_extractor(
                 data = json.loads(text_out[start:end])
             except json.JSONDecodeError:
                 pass
-        # Salvage truncated JSON (e.g. unterminated string at e.pos)
-        if data is None and getattr(e, "pos", None) is not None:
-            pos = min(e.pos, len(text_out))
-            segment = text_out[start:pos]
-            salvage = segment.strip()
-            if salvage:
+        # Salvage truncated JSON: truncate at error position, close string, complete trailing key/value, balance brackets
+        if data is None:
+            pos = min(getattr(e, "pos", None) or len(text_out), len(text_out))
+            segment = text_out[start:pos].rstrip()
+            if segment:
+                # Remove trailing comma so we can safely add a value or close
+                while segment.endswith(","):
+                    segment = segment[:-1].rstrip()
+                # If we truncated before a value (e.g. "key": or "key": "partial), close or add value
                 if segment.count('"') % 2 == 1:
-                    salvage += '"'
-                open_b = max(0, salvage.count("[") - salvage.count("]"))
-                open_c = max(0, salvage.count("{") - salvage.count("}"))
-                salvage += "]" * open_b + "}" * open_c
+                    segment += '"'
+                if segment.endswith(":"):
+                    segment += ' ""'
+                open_b = max(0, segment.count("[") - segment.count("]"))
+                open_c = max(0, segment.count("{") - segment.count("}"))
+                segment += "]" * open_b + "}" * open_c
                 try:
-                    data = json.loads(salvage)
+                    data = json.loads(segment)
                 except json.JSONDecodeError:
                     pass
         if data is None:

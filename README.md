@@ -21,6 +21,8 @@ Rather than a simple linear pipeline, this solution uses a **Stateful Multi-Agen
 
 The system follows a clean, modular architecture optimized for high-intelligence performance within the memory constraints of Render's free tier (~512MB RAM).
 
+![Architecture diagram](architecture.png)
+
 ### **The 4-Stage Workflow**
 
 1. **Stage 1: Validation & Safety (NeMo):** Verifies the input and checks for prompt injection/PII. Uses **GROQ_API_KEY** via `config/rails` (input capped to `MAX_NEMO_CHARS` to save tokens).
@@ -177,7 +179,23 @@ Set **one** of: **GEMINI_API_KEY**, **GROQ_API_KEY**, or **AZURE_OPENAI_API_KEY*
 3. **Process a contract:** `POST /contract/process` with header `Authorization: Bearer <access_token>` and body `{"text": "Your contract text here (at least 50 characters)..."}`. You can also send a file (PDF) via multipart.
 4. **Response:** You get an **AgentRunResult** JSON: `trace_id`, `status`, `confidence`, `stages`, `decision` (with faithfulness/answer_relevancy scores and NeMo fields), and `artifacts` (extraction).
 5. **Status:** `GET /contract/status/{trace_id}` with the same Bearer token to fetch the same result from SQLite.
-6. **Observability:** If `GSHEETS_WEBAPP_URL` is set, each run is POSTed to your Google Sheet; open the sheet to see all metrics and NeMo detections.
+6. **Dashboard:** `GET /analytics/dashboard` returns recent runs and `trace_id`s for status lookup.
+7. **Observability:** If `GSHEETS_WEBAPP_URL` is set, each run is POSTed to your Google Sheet.
+
+---
+
+## 📦 Deliverables (submission package)
+
+| Deliverable | Location |
+|-------------|----------|
+| **Architecture diagram** | [docs/ARCHITECTURE_DIAGRAM.md](docs/ARCHITECTURE_DIAGRAM.md) |
+| **Workflow walkthrough** (stage-by-stage, branching) | [docs/WORKFLOW_WALKTHROUGH.md](docs/WORKFLOW_WALKTHROUGH.md) |
+| **Source code + run instructions** | This README (Run & Deployment + How to run and check outputs) |
+| **Sample inputs/outputs** (2+ runs, incl. low-confidence) | [docs/SAMPLE_RUNS.md](docs/SAMPLE_RUNS.md) |
+| **AI evidence** (prompts/templates + example LLM output) | [docs/AI_EVIDENCE.md](docs/AI_EVIDENCE.md) |
+| **Agent-like behavior write-up** | [docs/AGENT_LIKE_BEHAVIOR.md](docs/AGENT_LIKE_BEHAVIOR.md) |
+
+**Checklist:** [docs/DELIVERABLES.md](docs/DELIVERABLES.md) — steps to complete and submit each item.
 
 ---
 

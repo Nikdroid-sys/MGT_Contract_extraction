@@ -63,8 +63,9 @@ async def process_contract(
         )
     doc_id = make_document_id(user_provided=document_id, filename=filename)
     trace_id = str(uuid4())
+    input_source = f"file: {filename}" if filename else "text"
     try:
-        result = run_contract_workflow(contract_text, trace_id=trace_id, document_id=doc_id)
+        result = run_contract_workflow(contract_text, trace_id=trace_id, document_id=doc_id, input_source=input_source)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:

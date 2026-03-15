@@ -34,7 +34,17 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _append_stage(state: GraphState, name: str, status: StageStatusEnum, started_at: datetime, ended_at: datetime | None = None, output_summary: str | None = None, err: str | None = None) -> dict:
+def _append_stage(
+    state: GraphState,
+    name: str,
+    status: StageStatusEnum,
+    started_at: datetime,
+    ended_at: datetime | None = None,
+    output_summary: str | None = None,
+    err: str | None = None,
+    input_summary: str | None = None,
+    tool_calls: list[dict] | None = None,
+) -> dict:
     stages = list(state.get("stages") or [])
     stages.append({
         "name": name,
@@ -43,18 +53,32 @@ def _append_stage(state: GraphState, name: str, status: StageStatusEnum, started
         "ended_at": ended_at or _now(),
         "output_summary": output_summary,
         "errors": [{"message": err}] if err else None,
+        "input_summary": input_summary,
+        "tool_calls": tool_calls,
     })
     return {"stages": stages}
+
+
+def _input_source_for_stage(state: GraphState) -> tuple[str | None, list[dict] | None]:
+    """Derive input_summary and tool_calls for the first stage from input_source (e.g. file: x.pdf)."""
+    source = (state.get("input_source") or "").strip()
+    if not source:
+        return None, None
+    if source.startswith("file:"):
+        filename = source.replace("file:", "").strip()
+        return source, [{"tool": "pdf_parser", "input": filename, "description": "Extract text from PDF/txt upload"}]
+    return source, None
 
 
 def validate_node(state: GraphState) -> dict:
     """Lightweight validation first; then NeMo guardrails (injection/PII). Store nemo_* for observability."""
     started = _now()
     input_text = (state.get("input_text") or "").strip()
+    input_summary, tool_calls = _input_source_for_stage(state)
     ok, msg = validate_contract_input(input_text)
     if not ok:
         return {
-            **_append_stage(state, "validation", StageStatusEnum.failed, started, err=msg),
+            **_append_stage(state, "validation", StageStatusEnum.failed, started, err=msg, input_summary=input_summary, tool_calls=tool_calls),
             "status": RunStatusEnum.failed.value,
             "last_error": msg,
             "nemo_passed": False,
@@ -87,6 +111,8 @@ def validate_node(state: GraphState) -> dict:
             StageStatusEnum.success,
             started,
             output_summary="Input accepted" + (" (NeMo: " + nemo_message + ")" if nemo_message else ""),
+            input_summary=input_summary,
+            tool_calls=tool_calls,
         ),
         "nemo_passed": nemo_passed,
         "nemo_message": nemo_message,
@@ -105,6 +131,9 @@ def extractor_node(state: GraphState) -> dict:
     try:
         extraction = run_extractor(input_text, document_id=document_id, auditor_feedback=auditor_feedback)
         art = extraction.model_dump(mode="json")
+        extractor_tool_calls = [
+            {"tool": "extractor_llm", "description": "Extract key terms from contract via LLM", "document_id": document_id},
+        ]
         return {
             **_append_stage(
                 state,
@@ -112,6 +141,7 @@ def extractor_node(state: GraphState) -> dict:
                 StageStatusEnum.success,
                 started,
                 output_summary=f"Extracted {len(extraction.fields)} fields",
+                tool_calls=extractor_tool_calls,
             ),
             "artifacts": art,
             "last_error": "",
@@ -120,7 +150,10 @@ def extractor_node(state: GraphState) -> dict:
         err_msg = str(e)
         logger.exception("Extractor failed: %s", e)
         return {
-            **_append_stage(state, "extractor", StageStatusEnum.failed, started, err=err_msg),
+            **_append_stage(
+                state, "extractor", StageStatusEnum.failed, started, err=err_msg,
+                tool_calls=[{"tool": "extractor_llm", "description": "Extract key terms from contract via LLM", "document_id": document_id}],
+            ),
             "status": RunStatusEnum.failed.value,
             "last_error": err_msg,
         }
@@ -141,6 +174,9 @@ def auditor_node(state: GraphState) -> dict:
         }
     try:
         score, reason, evaluation = run_audit(input_text, artifacts, threshold=settings.confidence_threshold)
+        auditor_tool_calls = [
+            {"tool": "deepeval_audit", "description": "Faithfulness + Answer Relevancy evaluation", "threshold": settings.confidence_threshold},
+        ]
         return {
             **_append_stage(
                 state,
@@ -148,6 +184,7 @@ def auditor_node(state: GraphState) -> dict:
                 StageStatusEnum.success,
                 started,
                 output_summary=f"score={score:.2f}",
+                tool_calls=auditor_tool_calls,
             ),
             "confidence": score,
             "confidence_rationale": reason or "Audit completed.",
@@ -156,7 +193,10 @@ def auditor_node(state: GraphState) -> dict:
     except Exception as e:
         logger.exception("Auditor failed: %s", e)
         return {
-            **_append_stage(state, "auditor", StageStatusEnum.failed, started, err=str(e)),
+            **_append_stage(
+                state, "auditor", StageStatusEnum.failed, started, err=str(e),
+                tool_calls=[{"tool": "deepeval_audit", "description": "Faithfulness + Answer Relevancy evaluation"}],
+            ),
             "status": RunStatusEnum.failed.value,
             "confidence": 0.0,
             "confidence_rationale": str(e),
@@ -230,7 +270,9 @@ def finalize_node(state: GraphState) -> dict:
             status=StageStatusEnum(s.get("status", "failed")),
             started_at=started,
             ended_at=ended,
+            input_summary=s.get("input_summary"),
             output_summary=s.get("output_summary"),
+            tool_calls=s.get("tool_calls"),
             errors=s.get("errors"),
         ))
 
@@ -311,10 +353,11 @@ def run_contract_workflow(
     input_text: str,
     trace_id: str | None = None,
     document_id: str | None = None,
+    input_source: str | None = None,
 ) -> AgentRunResult:
     """
     Run the full workflow synchronously. Returns the final AgentRunResult.
-    trace_id: unique run id (for status polling). document_id: optional id for the document; if not set, uses trace_id.
+    input_source: optional "file: <filename>" or "text" for stage observability (tool_calls / input_summary).
     """
     from uuid import uuid4
     tid = trace_id or str(uuid4())
@@ -322,6 +365,7 @@ def run_contract_workflow(
         "input_text": input_text,
         "trace_id": tid,
         "document_id": document_id if (document_id and document_id.strip()) else tid,
+        "input_source": (input_source or "").strip() or None,
         "stages": [],
         "retry_count": 0,
     }
