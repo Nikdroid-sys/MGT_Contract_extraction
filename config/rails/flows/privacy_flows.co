@@ -11,4 +11,5 @@ flow adf_input_security
   when user said something as $event
     $check = await injection_detection(text=$event.text)
     if $check == "malicious"
-      bot say "⚠️ Request blocked due to security policy."
+      bot say "REQUEST_BLOCKED"
+

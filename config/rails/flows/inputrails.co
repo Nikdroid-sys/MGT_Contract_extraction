@@ -1,3 +1,7 @@
+flow input rails_wrapper $input_text
+  activate adf_input_security
+  activate adf_privacy_masking
+
 flow main $input_text
   activate adf_input_security
   activate adf_privacy_masking

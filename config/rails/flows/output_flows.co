@@ -1,4 +1,4 @@
-flow outputrails $output_text
+flow output rails_wrapper $output_text
   activate adf_output_validation
   activate adf_privacy_masking
 
