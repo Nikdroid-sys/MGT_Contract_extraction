@@ -65,6 +65,7 @@ def _run_judge_sync(inp: str, actual_short: str, context: list[str]) -> dict[str
     messages = [{"role": "system", "content": JUDGE_SYSTEM}, {"role": "user", "content": user_content}]
     try:
         import litellm
+        print(f"[tool] judge_llm model={model} max_tokens=512", flush=True)
         response = litellm.completion(model=model, messages=messages, **extra)
         choices = getattr(response, "choices", None) or []
         msg = choices[0].message if choices else None

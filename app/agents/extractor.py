@@ -37,8 +37,9 @@ def run_extractor(
     Call LiteLLM (Gemini/Groq/Azure) to produce ContractKeyTermsExtraction.
     Raises on missing API key or parse failure. Input capped to max_contract_chars to save tokens.
     """
+    provider = (settings.llm_provider or "gemini").strip().lower()
     api_key = get_llm_api_key()
-    if not api_key:
+    if not api_key and provider != "ollama":
         raise ValueError(
             f"Set API key for provider '{settings.llm_provider}': "
             "GEMINI_API_KEY, GROQ_API_KEY, or AZURE_OPENAI_API_KEY"
@@ -55,13 +56,18 @@ def run_extractor(
     ]
     model = get_llm_model_string_extraction()
     extra = get_llm_completion_kwargs()
+    max_tokens = 2048
+    # Ollama/local runs: keep outputs short so demo doesn't stall.
+    if provider == "ollama":
+        max_tokens = 512
     try:
         import litellm
+        print(f"[tool] extractor_llm model={model} max_tokens={max_tokens} document_id={doc_id}", flush=True)
         response = litellm.completion(
             model=model,
             messages=messages,
             temperature=get_llm_temperature(),
-            max_tokens=2048,
+            max_tokens=max_tokens,
             **extra,
         )
         choices = getattr(response, "choices", None) or []

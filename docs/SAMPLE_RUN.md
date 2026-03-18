@@ -292,7 +292,7 @@ curl -X 'POST' \
 
 ---
 
-
+```
 sample 3
 curl -X 'POST' \
   'http://localhost:8080/contract/process' \
@@ -302,7 +302,8 @@ curl -X 'POST' \
   -F 'text=I dont want to be part of this contract this is shitty and nonsense.' \
   -F 'document_id=text_contract' \
   -F 'file='
-
+```
+```json
 {
   "trace_id": "3bb98742-ab07-4ec4-952f-c09773c599c6",
   "scenario": "scenario_2_contract",
@@ -484,7 +485,7 @@ curl -X 'POST' \
     ]
   }
 }
-
+```
 ## How to reproduce
 
 1. **High-confidence:** Use a full contract (PDF or long text) with clear parties, dates, termination, payment.

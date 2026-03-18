@@ -73,6 +73,8 @@ class Settings(BaseSettings):
     azure_openai_base_url: str = Field(default="", description="Azure OpenAI endpoint URL. Set AZURE_OPENAI_BASE_URL.")
     llm_temperature: float = Field(default=0.1, ge=0, le=2, description="LLM temperature for extraction. Set LLM_TEMPERATURE.")
     llm_eval_temperature: float = Field(default=0.0, ge=0, le=2, description="LLM temperature for DeepEval. Set LLM_EVAL_TEMPERATURE.")
+    # Ollama (local) - OpenAI-compatible endpoint (if using `LLM_PROVIDER=ollama`)
+    ollama_base_url: str = Field(default="http://localhost:11434", description="Ollama base URL for LiteLLM (uses /api/generate).")
     gsheets_webapp_url: str = Field(default="", description="Google Apps Script Web App URL for logging runs.")
     max_extraction_retries: int = Field(default=2, ge=1, le=5, description="Self-healing retry limit. Set MAX_EXTRACTION_RETRIES.")
     confidence_threshold: float = Field(default=0.8, ge=0, le=1, description="Min score to accept extraction. Set CONFIDENCE_THRESHOLD.")

@@ -43,6 +43,9 @@ def get_llm_model_string_auxiliary() -> str:
 def get_llm_api_key() -> str:
     """API key for the current LLM provider."""
     provider = (settings.llm_provider or "gemini").strip().lower()
+    if provider == "ollama":
+        # Ollama doesn't require API keys.
+        return ""
     if provider == "groq":
         return (settings.groq_api_key or "").strip()
     if provider == "gemini":
@@ -59,6 +62,10 @@ def get_llm_completion_kwargs() -> dict[str, Any]:
     api_key = get_llm_api_key()
     if api_key:
         kwargs["api_key"] = api_key
+    if provider == "ollama":
+        # OpenAI-compatible endpoint exposed by Ollama.
+        base = getattr(settings, "ollama_base_url", None) or "http://localhost:11434"
+        kwargs["api_base"] = base.rstrip("/")
     if provider == "groq":
         base = (settings.groq_base_url or "https://api.groq.com").rstrip("/")
         if not base.endswith("/openai/v1"):
@@ -82,6 +89,8 @@ def get_llm_eval_temperature() -> float:
 def get_llm_base_url_for_litellm() -> str | None:
     """OpenAI-compatible base URL for LiteLLM (DeepEval), or None for Gemini."""
     provider = (settings.llm_provider or "gemini").strip().lower()
+    if provider == "ollama":
+        return (getattr(settings, "ollama_base_url", None) or "http://localhost:11434").rstrip("/")
     if provider == "groq":
         base = (settings.groq_base_url or "https://api.groq.com").rstrip("/")
         return base if base.endswith("/openai/v1") else f"{base}/openai/v1"

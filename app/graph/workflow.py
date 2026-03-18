@@ -75,8 +75,14 @@ def validate_node(state: GraphState) -> dict:
     started = _now()
     input_text = (state.get("input_text") or "").strip()
     input_summary, tool_calls = _input_source_for_stage(state)
+    trace_id = state.get("trace_id") or ""
+    print(
+        f"[workflow] validate_node trace_id={trace_id} input_len={len(input_text)} input_source={state.get('input_source')}",
+        flush=True,
+    )
     ok, msg = validate_contract_input(input_text)
     if not ok:
+        print(f"[workflow] validate_node lightweight check FAILED: {msg}", flush=True)
         return {
             **_append_stage(state, "validation", StageStatusEnum.failed, started, err=msg, input_summary=input_summary, tool_calls=tool_calls),
             "status": RunStatusEnum.failed.value,
@@ -93,8 +99,10 @@ def validate_node(state: GraphState) -> dict:
     nemo_passed = nemo.get("passed", False)
     nemo_message = nemo.get("message", "")
     nemo_detections = nemo.get("detections") or []
-    # If NeMo explicitly blocked (injection), fail the run
-    if not nemo_passed and "blocked" in nemo_message.lower():
+    # Fail-safe: if NeMo does not pass (blocked or unavailable/error), skip extraction/auditing.
+    # This prevents the unsafe path where prompt injection slips through to the LLM extractor.
+    if not nemo_passed:
+        print(f"[workflow] validate_node NeMo NOT PASSED: nemo_message={nemo_message} detections={nemo_detections}", flush=True)
         return {
             **_append_stage(state, "validation", StageStatusEnum.failed, started, err=nemo_message),
             "status": RunStatusEnum.failed.value,
@@ -103,7 +111,7 @@ def validate_node(state: GraphState) -> dict:
             "nemo_message": nemo_message,
             "nemo_detections": nemo_detections,
         }
-    # NeMo passed or unavailable (we still proceed)
+    print(f"[workflow] validate_node NeMo passed: nemo_message={nemo_message} detections={nemo_detections}", flush=True)
     return {
         **_append_stage(
             state,
@@ -128,6 +136,10 @@ def extractor_node(state: GraphState) -> dict:
     document_id = state.get("document_id") or trace_id
     last_error = (state.get("last_error") or "").strip()
     auditor_feedback = last_error if last_error else None
+    print(
+        f"[workflow] extractor_node trace_id={trace_id} document_id={document_id} retry_count={state.get('retry_count') or 0}",
+        flush=True,
+    )
     try:
         extraction = run_extractor(input_text, document_id=document_id, auditor_feedback=auditor_feedback)
         art = extraction.model_dump(mode="json")
@@ -164,6 +176,8 @@ def auditor_node(state: GraphState) -> dict:
     started = _now()
     input_text = state.get("input_text") or ""
     artifacts = state.get("artifacts")
+    trace_id = state.get("trace_id") or ""
+    print(f"[workflow] auditor_node trace_id={trace_id} artifacts_present={bool(artifacts)}", flush=True)
     if not artifacts:
         return {
             **_append_stage(state, "auditor", StageStatusEnum.failed, started, err="No artifacts to audit"),
@@ -210,11 +224,15 @@ def _route_after_auditor(state: GraphState) -> Literal["retry_prep", "finalize"]
     retry_count = state.get("retry_count") or 0
     status = state.get("status")
     if status == RunStatusEnum.failed.value:
+        print("[workflow] route_after_auditor status=failed -> finalize", flush=True)
         return "finalize"
     if confidence >= settings.confidence_threshold:
+        print(f"[workflow] route_after_auditor confidence={confidence:.2f} >= threshold -> finalize", flush=True)
         return "finalize"
     if retry_count >= settings.max_extraction_retries:
+        print(f"[workflow] route_after_auditor retry_count={retry_count} exhausted -> finalize", flush=True)
         return "finalize"
+    print(f"[workflow] route_after_auditor confidence={confidence:.2f} < threshold -> retry_prep", flush=True)
     return "retry_prep"
 
 
@@ -229,7 +247,9 @@ def retry_prep_node(state: GraphState) -> dict:
 def _route_after_validate(state: GraphState) -> Literal["extractor", "finalize"]:
     """If validation failed, go to finalize; else extractor."""
     if state.get("status") == RunStatusEnum.failed.value:
+        print("[workflow] route_after_validate status=failed -> finalize", flush=True)
         return "finalize"
+    print("[workflow] route_after_validate status=ok -> extractor", flush=True)
     return "extractor"
 
 
@@ -253,6 +273,10 @@ def finalize_node(state: GraphState) -> dict:
         status = status or (RunStatusEnum.completed.value if (confidence or 0) >= settings.confidence_threshold else RunStatusEnum.needs_review.value)
 
     created_at = _now()
+    print(
+        f"[workflow] finalize_node trace_id={trace_id} status={status} confidence={confidence} retry_count={retry_count} nemo_passed={state.get('nemo_passed')}",
+        flush=True,
+    )
     stages: list[StageRecord] = []
     for s in stages_raw:
         started = s.get("started_at")

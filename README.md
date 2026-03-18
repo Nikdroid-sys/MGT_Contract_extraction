@@ -184,18 +184,6 @@ Set **one** of: **GEMINI_API_KEY**, **GROQ_API_KEY**, or **AZURE_OPENAI_API_KEY*
 
 ---
 
-## 📦 Deliverables (submission package)
-
-| Deliverable | Location |
-|-------------|----------|
-| **Architecture diagram** | [docs/ARCHITECTURE_DIAGRAM.md](docs/ARCHITECTURE_DIAGRAM.md) |
-| **Workflow walkthrough** (stage-by-stage, branching) | [docs/WORKFLOW_WALKTHROUGH.md](docs/WORKFLOW_WALKTHROUGH.md) |
-| **Source code + run instructions** | This README (Run & Deployment + How to run and check outputs) |
-| **Sample inputs/outputs** (2+ runs, incl. low-confidence) | [docs/SAMPLE_RUNS.md](docs/SAMPLE_RUNS.md) |
-| **AI evidence** (prompts/templates + example LLM output) | [docs/AI_EVIDENCE.md](docs/AI_EVIDENCE.md) |
-| **Agent-like behavior write-up** | [docs/AGENT_LIKE_BEHAVIOR.md](docs/AGENT_LIKE_BEHAVIOR.md) |
-
-**Checklist:** [docs/DELIVERABLES.md](docs/DELIVERABLES.md) — steps to complete and submit each item.
 
 ---
 
